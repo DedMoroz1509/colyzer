@@ -1,0 +1,178 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: #212529;
+  background-color: #f7f7f8;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* Шапка */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.app-header__inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 76px;
+}
+
+.app-header__logo {
+  justify-self: start;
+  color: #212529;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.app-header__upload {
+  justify-self: center;
+}
+
+.app-header__placeholder {
+  justify-self: end;
+}
+
+/* Главный блок */
+
+.hero-section {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(177, 197, 177, 0.35),
+      transparent 45%
+    ),
+    #ffffff;
+}
+
+.hero-section__title {
+  max-width: 760px;
+}
+
+.hero-section__description {
+  max-width: 720px;
+}
+
+/* Область загрузки */
+
+.upload-area {
+  border: 2px dashed #adb5bd;
+  border-radius: 16px;
+  background-color: #f8f9fa;
+}
+
+.upload-preview {
+  width: 100%;
+  max-height: 340px;
+  object-fit: contain;
+  background-color: #f1f1f1;
+}
+
+/* Примеры */
+
+.example-card__image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.example-color {
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+}
+
+/* Страница анализа */
+
+.analysis-image-card {
+  position: sticky;
+  top: 105px;
+}
+
+.analysis-image {
+  width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background-color: #f1f1f1;
+}
+
+.color-result {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  background-color: #ffffff;
+}
+
+.color-result__sample {
+  width: 72px;
+  height: 72px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+}
+
+.color-result__information {
+  min-width: 0;
+}
+
+.progress {
+  height: 8px;
+}
+
+/* Мобильная версия */
+
+@media (max-width: 767px) {
+  .app-header__inner {
+    grid-template-columns: 1fr auto;
+    min-height: 68px;
+  }
+
+  .app-header__placeholder {
+    display: none;
+  }
+
+  .app-header__upload {
+    justify-self: end;
+  }
+
+  .analysis-image-card {
+    position: static;
+  }
+
+  .color-result {
+    grid-template-columns: 56px 1fr;
+  }
+
+  .color-result__sample {
+    width: 56px;
+    height: 56px;
+  }
+
+  .color-result > button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
