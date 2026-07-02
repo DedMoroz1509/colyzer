@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { mockAnalysisResult } from '../data/mockAnalysis.js';
+import { analyzeImage } from '../services/imageAnalysisApi.js';
 import { validateImageFile } from '../utils/fileValidation.js';
 import { formatFileSize } from '../utils/formatFileSize.js';
 
@@ -12,6 +12,8 @@ function UploadModal({ isOpen, onClose }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [colorCount, setColorCount] = useState(8);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -46,34 +48,64 @@ function UploadModal({ isOpen, onClose }) {
     if (file) {
       processFile(file);
     }
-
     event.target.value = '';
   };
 
-  const handleClose = () => {
+  const resetAndClose = () => {
     setSelectedFile(null);
     setError('');
+    setIsAnalyzing(false);
+    setColorCount(8);
+
     onClose();
   };
 
-  const handleAnalyze = () => {
+  const handleClose = () => {
+    if (isAnalyzing) {
+      return;
+    }
+
+    resetAndClose();
+  };
+
+  const handleAnalyze = async () => {
     if (!selectedFile) {
       setError('Сначала выберите изображение.');
       return;
     }
 
-    const fileForAnalysis = selectedFile;
+    if (isAnalyzing) {
+      return;
+    }
 
-    setSelectedFile(null);
     setError('');
-    onClose();
+    setIsAnalyzing(true);
 
-    navigate('/analysis', {
-      state: {
-        file: fileForAnalysis,
-        result: mockAnalysisResult,
-      },
-    });
+    const analyzedFile = selectedFile;
+
+    try {
+      const result = await analyzeImage(
+        analyzedFile,
+        colorCount,
+      );
+
+      resetAndClose();
+
+      navigate('/analysis', {
+        state: {
+          file: analyzedFile,
+          result,
+        },
+      });
+    } catch (requestError) {
+      const errorMessage =
+        requestError instanceof Error
+          ? requestError.message
+          : 'Во время анализа произошла неизвестная ошибка.';
+
+      setError(errorMessage);
+      setIsAnalyzing(false);
+    }
   };
 
   if (!isOpen) {
@@ -88,15 +120,21 @@ function UploadModal({ isOpen, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="upload-modal-title"
+        aria-busy={isAnalyzing}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) {
+          const clickedBackdrop =
+            event.target === event.currentTarget;
+
+          if (!isAnalyzing && clickedBackdrop) {
             handleClose();
           }
         }}
       >
         <div
           className="modal-dialog modal-dialog-centered modal-lg"
-          onMouseDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => {
+            event.stopPropagation();
+          }}
         >
           <div className="modal-content">
             <div className="modal-header">
@@ -109,8 +147,8 @@ function UploadModal({ isOpen, onClose }) {
                 </h2>
 
                 <p className="text-secondary small mb-0 mt-1">
-                  Выберите изображение и запустите анализ цветовой
-                  гаммы.
+                  Выберите изображение и запустите анализ
+                  цветовой гаммы.
                 </p>
               </div>
 
@@ -118,11 +156,22 @@ function UploadModal({ isOpen, onClose }) {
                 type="button"
                 className="btn-close"
                 aria-label="Закрыть"
+                disabled={isAnalyzing}
                 onClick={handleClose}
               />
             </div>
 
             <div className="modal-body">
+              
+              <input
+                ref={inputRef}
+                type="file"
+                className="d-none"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={isAnalyzing}
+                onChange={handleFileChange}
+              />
+
               {!selectedFile && (
                 <div className="upload-area text-center p-5">
                   <h3 className="fs-5">
@@ -130,21 +179,17 @@ function UploadModal({ isOpen, onClose }) {
                   </h3>
 
                   <p className="text-secondary">
-                    Поддерживаются JPG, PNG и WEBP размером до 10 МБ.
+                    Поддерживаются JPG, PNG и WEBP
+                    размером до 10 МБ.
                   </p>
-
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    className="d-none"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleFileChange}
-                  />
 
                   <button
                     type="button"
                     className="btn btn-outline-dark"
-                    onClick={() => inputRef.current?.click()}
+                    disabled={isAnalyzing}
+                    onClick={() => {
+                      inputRef.current?.click();
+                    }}
                   >
                     Выбрать файл
                   </button>
@@ -153,7 +198,7 @@ function UploadModal({ isOpen, onClose }) {
 
               {selectedFile && (
                 <div className="row g-4 align-items-center">
-                  <div className="col-md-6">
+                  <div className="col-12 col-md-6">
                     <img
                       src={previewUrl}
                       className="upload-preview rounded"
@@ -161,7 +206,7 @@ function UploadModal({ isOpen, onClose }) {
                     />
                   </div>
 
-                  <div className="col-md-6">
+                  <div className="col-12 col-md-6">
                     <h3 className="fs-5 mb-3">
                       Изображение выбрано
                     </h3>
@@ -178,31 +223,101 @@ function UploadModal({ isOpen, onClose }) {
                       </dd>
 
                       <dt>Формат</dt>
-                      <dd>{selectedFile.type}</dd>
+                      <dd>
+                        {selectedFile.type || 'Не определён'}
+                      </dd>
                     </dl>
+
+                    <div className="mb-4">
+                      <label
+                        htmlFor="color-count"
+                        className="form-label fw-semibold"
+                      >
+                        Количество групп оттенков
+                      </label>
+
+                      <select
+                        id="color-count"
+                        className="form-select"
+                        value={colorCount}
+                        disabled={isAnalyzing}
+                        onChange={(event) => {
+                          setColorCount(
+                            Number(event.target.value),
+                          );
+                        }}
+                      >
+                        <option value={4}>
+                          4 оттенка
+                        </option>
+
+                        <option value={6}>
+                          6 оттенков
+                        </option>
+
+                        <option value={8}>
+                          8 оттенков
+                        </option>
+
+                        <option value={10}>
+                          10 оттенков
+                        </option>
+
+                        <option value={12}>
+                          12 оттенков
+                        </option>
+
+                        <option value={16}>
+                          16 оттенков
+                        </option>
+
+                        <option value={20}>
+                          20 оттенков
+                        </option>
+                      </select>
+
+                      <div className="form-text">
+                        Чем больше значение, тем подробнее
+                        будет полученная палитра.
+                      </div>
+                    </div>
 
                     <button
                       type="button"
                       className="btn btn-outline-secondary"
-                      onClick={() => inputRef.current?.click()}
+                      disabled={isAnalyzing}
+                      onClick={() => {
+                        inputRef.current?.click();
+                      }}
                     >
-                      Выбрать другое
+                      Выбрать другое изображение
                     </button>
+                  </div>
+                </div>
+              )}
 
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      className="d-none"
-                      accept="image/jpeg,image/png,image/webp"
-                      onChange={handleFileChange}
+              {isAnalyzing && (
+                <div
+                  className="alert alert-info mt-4 mb-0"
+                  role="status"
+                >
+                  <div className="d-flex align-items-center gap-3">
+                    <div
+                      className="spinner-border spinner-border-sm"
+                      aria-hidden="true"
                     />
+
+                    <span>
+                      Изображение отправлено на сервер.
+                      Выполняется анализ цветовой гаммы…
+                    </span>
                   </div>
                 </div>
               )}
 
               {error && (
                 <div
-                  className="alert alert-danger mt-3 mb-0"
+                  className="alert alert-danger mt-4 mb-0"
                   role="alert"
                 >
                   {error}
@@ -214,6 +329,7 @@ function UploadModal({ isOpen, onClose }) {
               <button
                 type="button"
                 className="btn btn-outline-secondary"
+                disabled={isAnalyzing}
                 onClick={handleClose}
               >
                 Отмена
@@ -222,10 +338,19 @@ function UploadModal({ isOpen, onClose }) {
               <button
                 type="button"
                 className="btn btn-dark"
-                disabled={!selectedFile}
+                disabled={!selectedFile || isAnalyzing}
                 onClick={handleAnalyze}
               >
-                Анализировать
+                {isAnalyzing && (
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    aria-hidden="true"
+                  />
+                )}
+
+                {isAnalyzing
+                  ? 'Выполняется анализ...'
+                  : 'Анализировать'}
               </button>
             </div>
           </div>
